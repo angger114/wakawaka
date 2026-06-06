@@ -214,7 +214,7 @@ jobs:
           password: ${{ secrets.SMTP2GO_PASSWORD }}
           subject: "📦 Deployment Started: ${{ github.actor }}"
           to: ${{ env.OWNER_EMAIL }}
-          from: "aws@seamolec.org"  # ⬅️ FIXED: Hanya email tanpa nama
+          from: "anggerbektian114@gmail.com"  # ⬅️ FIXED: Hanya email tanpa nama
           html_body: |
             <!DOCTYPE html>
             <html>
