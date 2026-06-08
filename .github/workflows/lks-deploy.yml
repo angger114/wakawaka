@@ -14,134 +14,134 @@ on:
       - '.github/workflows/**'
   workflow_dispatch:
 
-  jobs:
-    deploy-frontend:
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout Repo
-          uses: actions/checkout@v4
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
 
-        - name: Configure AWS credentials
-          uses: aws-actions/configure-aws-credentials@v4
-          with:
-            aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-            aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
-            aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
-            aws-region: us-east-1
-        
-        - name: Validate AWS credentials
-          run: aws sts get-caller-identity
-        
-        - name: Validate frontend file
-          run: |
-            [ -f "frontend/index.html" ] && echo "index.html found" || exit 1
-            [ -f "frontend/app.js" ] && echo "app.js found" || exit 1
-            [ -f "amplify.yml" ] && echo "amplify.yml found" || exit 1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
+          aws-region: us-east-1
+      
+      - name: Validate AWS credentials
+        run: aws sts get-caller-identity
+      
+      - name: Validate frontend file
+        run: |
+          [ -f "frontend/index.html" ] && echo "index.html found" || exit 1
+          [ -f "frontend/app.js" ] && echo "app.js found" || exit 1
+          [ -f "amplify.yml" ] && echo "amplify.yml found" || exit 1
 
-        - name: Chek amplify app
-          id: check-app
-          run: |
-            APP_ID=$(aws amplify list-apps \
-              --query "apps[?name=='lks-amplify-order-app'].appId | [0]" \
-              --output text)
+      - name: Chek amplify app
+        id: check-app
+        run: |
+          APP_ID=$(aws amplify list-apps \
+            --query "apps[?name=='lks-amplify-order-app'].appId | [0]" \
+            --output text)
 
-            if [ -z "$APP_ID" ]; then
-              echo "Amplify app not exist"
-              exit 1
-            else
-              echo "app_id=$APP_ID" >> $GITHUB_OUTPUT
-              echo "Amplify App found: $APP_ID"
-            fi
-        
-        - name: Trigger Deployment
-          id: trigger
-          timeout-minutes: 10
-          run: |
-            APP_ID="${{ steps.check-app.outputs.app_id }}"
+          if [ -z "$APP_ID" ]; then
+            echo "Amplify app not exist"
+            exit 1
+          else
+            echo "app_id=$APP_ID" >> $GITHUB_OUTPUT
+            echo "Amplify App found: $APP_ID"
+          fi
+      
+      - name: Trigger Deployment
+        id: trigger
+        timeout-minutes: 10
+        run: |
+          APP_ID="${{ steps.check-app.outputs.app_id }}"
 
-            JOB_ID=$(aws amplify start-job \
-              --app-id $APP_ID \
-              --branch-name master \
-              --job-type RELEASE \
-              --query 'jobSummary.jobId' \
-              --output text)
+          JOB_ID=$(aws amplify start-job \
+            --app-id $APP_ID \
+            --branch-name master \
+            --job-type RELEASE \
+            --query 'jobSummary.jobId' \
+            --output text)
 
-            echo "job_id=$JOB_ID" >> $GITHUB_OUTPUT
-            echo "Job started: $JOB_ID"
+          echo "job_id=$JOB_ID" >> $GITHUB_OUTPUT
+          echo "Job started: $JOB_ID"
 
-            echo "Deploying App..."
-            STATUS="PENDING"
-            while [ "$STATUS" = "PENDING" ] || [ "$STATUS" = "RUNNING" ]; do
-              sleep 10
+          echo "Deploying App..."
+          STATUS="PENDING"
+          while [ "$STATUS" = "PENDING" ] || [ "$STATUS" = "RUNNING" ]; do
+            sleep 10
 
-              STATUS=$(aws amplify get-job \
-                --app-id ${{ steps.check-app.outputs.app_id }} \
-                --branch-name master \
-                --job-id $JOB_ID \
-                --query 'job.summary.status' \
-                --output text)
-              echo "Current Status: $STATUS"
-            done
-
-            if [ "$STATUS" = "SUCCEED" ]; then
-              echo "Deployment Complete"
-            else
-              echo "Deployment failed :("
-              exit 1
-            fi
-        - name: Get App URL
-          id: get-url
-          run: |
-            APP_DOMAIN=$(aws amplify get-app \
+            STATUS=$(aws amplify get-job \
               --app-id ${{ steps.check-app.outputs.app_id }} \
-              --query 'app.defaultDomain' \
+              --branch-name master \
+              --job-id $JOB_ID \
+              --query 'job.summary.status' \
               --output text)
+            echo "Current Status: $STATUS"
+          done
 
-            APP_URL="https://master.$APP_DOMAIN"
-            echo "Application URL: $APP_URL"
-            echo "app_url=$APP_URL" >> $GITHUB_OUTPUT
-            echo "FINAL_APP_URL=$APP_URL" >> $GITHUB_ENV
+          if [ "$STATUS" = "SUCCEED" ]; then
+            echo "Deployment Complete"
+          else
+            echo "Deployment failed :("
+            exit 1
+          fi
+      - name: Get App URL
+        id: get-url
+        run: |
+          APP_DOMAIN=$(aws amplify get-app \
+            --app-id ${{ steps.check-app.outputs.app_id }} \
+            --query 'app.defaultDomain' \
+            --output text)
 
-        - name: Create deployment summary
-          if: always()
-          run: |
-            cat << EOF >> $GITHUB_STEP_SUMMARY
-            ## Frontend Deployment Summary
+          APP_URL="https://master.$APP_DOMAIN"
+          echo "Application URL: $APP_URL"
+          echo "app_url=$APP_URL" >> $GITHUB_OUTPUT
+          echo "FINAL_APP_URL=$APP_URL" >> $GITHUB_ENV
 
-            - **Status:** ${{ steps.trigger.conclusion == 'success' && 'SUCCEED' || 'FAILED' }}
-            - **Repository:** ${{ github.repository }} ('${{github.ref_name}}')
-            - **Triggered By:** ${{ github.actor }}
-            - **Live URL:** ${{ env.FINAL_APP_URL || 'N/A' }}
+      - name: Create deployment summary
+        if: always()
+        run: |
+          cat << EOF >> $GITHUB_STEP_SUMMARY
+          ## Frontend Deployment Summary
 
-            ---
-            [View full workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            EOF
-            echo "$GITHUB_STEP_SUMMARY"
-    notify:
-      needs: deploy-frontend
-      if: always() && (gihtub.ref_name == 'master')
-      runs-on: ubuntu-latest
-      steps:
-        - name: Configure AWS credentials
-          uses: aws-actions/configure-aws-credentials@v4
-          with:
-            aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-            aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
-            aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
-            aws-region: us-east-1
+          - **Status:** ${{ steps.trigger.conclusion == 'success' && 'SUCCEED' || 'FAILED' }}
+          - **Repository:** ${{ github.repository }} ('${{github.ref_name}}')
+          - **Triggered By:** ${{ github.actor }}
+          - **Live URL:** ${{ env.FINAL_APP_URL || 'N/A' }}
 
-        - name: Send SNS Notification
-          run: |
-            DEPLOY_STATUS="${{ needs.deploy-frontend.result }}"
+          ---
+          [View full workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF
+          echo "$GITHUB_STEP_SUMMARY"
+  notify:
+    needs: deploy-frontend
+    if: always() && (gihtub.ref_name == 'master')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
+          aws-region: us-east-1
 
-            aws sns publis \
-              --topic-arn "${{ secrets.AWS_SNS_TOPIC_ARN }}" \
-              --subject "Amplify Deployment Alert: $DEPLOY_STATUS" \
-              --message "Frontend deployment process has finished.
-            
-            Details:
-            - Deployment Status: $DEPLOY_STATUS
-            - Commit: ${{ github.sha }}
-            - Author: ${{ github.actor }}
-            - Workflow Run Link: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      - name: Send SNS Notification
+        run: |
+          DEPLOY_STATUS="${{ needs.deploy-frontend.result }}"
+
+          aws sns publis \
+            --topic-arn "${{ secrets.AWS_SNS_TOPIC_ARN }}" \
+            --subject "Amplify Deployment Alert: $DEPLOY_STATUS" \
+            --message "Frontend deployment process has finished.
+          
+          Details:
+          - Deployment Status: $DEPLOY_STATUS
+          - Commit: ${{ github.sha }}
+          - Author: ${{ github.actor }}
+          - Workflow Run Link: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
