@@ -134,7 +134,7 @@ jobs:
         run: |
           DEPLOY_STATUS="${{ needs.deploy-frontend.result }}"
 
-          aws sns publis \
+          aws sns publish \
             --topic-arn "${{ secrets.AWS_SNS_TOPIC_ARN }}" \
             --subject "Amplify Deployment Alert: $DEPLOY_STATUS" \
             --message "Frontend deployment process has finished.
