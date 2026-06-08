@@ -143,5 +143,5 @@ jobs:
           - Deployment Status: $DEPLOY_STATUS
           - Commit: ${{ github.sha }}
           - Author: ${{ github.actor }}
-          - Workflow Run Link: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          - Workflow Run Link: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
